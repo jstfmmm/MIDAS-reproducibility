@@ -1,0 +1,188 @@
+# 优化版配置文件 - 减少GPU显存使用
+# Project
+
+log_detail: False 
+max_knowledge_length: 500 # 减少到500以降低内存使用
+tokenizer:  
+
+seed: 42
+
+# Dataset or file
+data: open_natural_question
+test_file: ./data/datasets/open_natural_question/10_example.jsonl
+
+cache_dir: 
+cache_parameter_dir: ./output/parameter_setting/nq-llama-7b.txt
+ignore_method_weight: 0.1
+
+# Output dir
+output_dir: ./output/
+
+result_file: result.json
+result_info_file: result_info.json
+
+run_evaluation: True
+cached_score_path: 
+
+# 关键优化：使用单GPU避免DDP内存开销
+gpu: [0]  # 只使用一个GPU
+
+ControllerConfig:
+# 减少同时启用的模块数量
+  Web:
+    turn_on: False  # 暂时关闭Web检索
+  Wiki:
+    turn_on: True
+  Gendoc: 
+    turn_on: False  # 暂时关闭生成文档
+  Contriever:
+    turn_on: True
+  Summarizer: 
+    turn_on: False  # 暂时关闭摘要模块
+
+GeneratorConfig:
+  turn_on: True
+  module: 
+  without_retrieval: False
+  dynamic_retrieval: True
+
+EvaluatorConfig:
+  VoterModule:
+    turn_on: True
+    module:
+  ScorerModule:
+    turn_on: False  # 暂时关闭评分模块以节省内存
+    module:
+
+# 模块配置 - 大幅减少batch size
+ModuleConfig:
+  Wiki:
+    type: Wiki
+    verbose: True
+    turn_on: True
+    load_result_file: 
+    save_result_file: wiki_result.json
+    load_info_file: 
+    save_info_file: wiki_info.json
+    batch_size: 64  # 从1024减少到64
+    top_k: 5
+    language: en
+    
+  Contriever:
+    type: Contriever
+    verbose: True
+    turn_on: True
+    load_result_file: 
+    save_result_file: contriever_result.json
+    load_info_file: 
+    save_info_file: contriever_info.json
+    batch_size: 1  # 从2减少到1
+    top_k: 5
+    language: en
+    query_encoder: en_query_encoder
+    paragraph_encoder: en_paragraph_encoder
+    
+  Generator:
+    type: Generator
+    verbose: True
+    turn_on: True
+    load_result_file: 
+    save_result_file: generator_result.json
+    load_info_file: 
+    save_info_file: generator_info.json
+    batch_size: 1  # 从2减少到1
+    num_responses_per_prompt: 1  # 减少每个prompt的响应数量
+    llm: llama-llm1
+    template_id: 1
+    max_new_tokens: 100  # 从150减少到100
+    
+  Voter:
+    type: Voter
+    verbose: True
+    load_result_file: 
+    save_result_file: vote_result.json
+    load_info_file: 
+    save_info_file: vote_info.json
+    scoring_method: em  # 使用更简单的评分方法
+    bidirectional:
+      nli: True
+      nli_with_query: True
+      em: True
+    composition_weight: [0, 0, 0, 1, 0, 0]  # 仅使用em
+    threshold: 0.0
+    pooling_method: mean
+    pooling_threshold: 
+    min_acceptance_num: 2
+    mean_pooling_topk: 
+    method_weight: True
+    batch_size: 64  # 从512减少到64
+    hierarchical_voting: 
+      turn_on: False  # 关闭层次投票以简化
+      pooling_method: mean
+      pooling_threshold: 
+      min_acceptance_num: 2
+      mean_pooling_topk:
+    
+  Scorer:
+    type: Scorer
+    verbose: True
+    load_result_file: 
+    save_result_file: score_result.json
+    load_info_file: 
+    save_info_file: score_info.json
+    zh_model_name: llama-llm1
+    zh_template_id: 1
+    en_model_name: llama-llm1
+    en_template_id: 1
+    tokenize_kwargs: 
+      padding: longest
+      truncation: False
+    reward_kwargs:
+      batch_size: 16
+
+# LLM配置 - 启用fp16以节省内存
+LLMConfig:
+  llama-llm1:
+    model_name: llama2-chat-7b
+    model_path: ./data/model/llama7b
+    model_class: LlamaForCausalLM
+    fp16: True  # 启用半精度以节省内存
+    tokenizer_class: LlamaTokenizer
+    
+  llm5:
+    model_name: en_query_encoder
+    model_path: ./data/model/contriever-msmarco
+    model_class: AutoModel
+    fp16: True  # 启用半精度
+    tokenizer_path: ./data/model/models--facebook--contriever-msmarco
+    tokenizer_class: AutoTokenizer
+    
+  llm6:
+    model_name: en_paragraph_encoder
+    model_path: ./data/model/contriever-msmarco
+    model_class: AutoModel
+    fp16: True  # 启用半精度
+    tokenizer_path: ./data/model/models--facebook--contriever-msmarco
+    tokenizer_class: AutoTokenizer
+
+# 控制方法配置
+ControlConfig:
+  wiki:
+    method_name: wiki
+    turn_on: True
+    summarize: False  # 关闭摘要以节省内存
+    keep_both: False
+    Modules:
+      retriever: Wiki
+      contriever: Contriever
+    help: "use wiki retrieval only"
+    
+  gc:
+    method_name: google_contrieve
+    turn_on: False  # 暂时关闭
+    summarize: False
+    keep_both: False
+    Modules:
+      retriever:
+      contriever: Contriever
+    help: "google search then contrieve"

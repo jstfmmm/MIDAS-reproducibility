@@ -1,0 +1,320 @@
+# SciQ 多源检索实验配置
+# 5个基础检索路径（其中2个 keep_both 会自动衍生出summary变体，共7条有效路径）：
+# 搜索引擎(top1/top5/top5+summary) + BM25索引(top1/top5/top5+summary,基于support语料库) + 模型生成
+
+log_detail: False
+max_knowledge_length: 2000
+tokenizer:
+ddp: False
+seed: 42
+
+# Dataset - SciQ
+data: sciq
+test_file: ./data/datasets/sciq/sciq_test.jsonl  # 由 sciq_processor.py --convert 生成
+
+cache_dir:
+cache_parameter_dir: ./output/parameter_setting/sciq-llama-7b.txt
+ignore_method_weight: 0.1
+
+# Output dir
+output_dir: ./output/sciq/
+
+result_file: result.json
+result_info_file: result_info.json
+
+run_evaluation: True
+cached_score_path:
+
+# GPU设置
+gpu: [3]
+
+ControllerConfig:
+  Web:
+  Wiki:
+  Gendoc:
+  Contriever:
+  Summarizer:
+  SciQBm25:
+
+GeneratorConfig:
+  turn_on: True
+  module:
+  without_retrieval: False
+  dynamic_retrieval: True
+
+EvaluatorConfig:
+  VoterModule:
+    turn_on: True
+    module:
+  ScorerModule:
+    turn_on: False
+    module:
+
+# 检索路径配置
+ControlConfig:
+  # 1. 搜索引擎 top1
+  search_top1:
+    method_name: google_best
+    turn_on: True
+    summarize: False
+    keep_both: False
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "Web search - select best result (top1)"
+
+  # 2&3. 搜索引擎 top5 (keep_both=True 同时产出 search_top5 和 search_top5_sum)
+  search_top5:
+    method_name: google_merge
+    turn_on: True
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "Web search - merge top5 results, with and without summary"
+
+  # 4. Support语料库 BM25 top1
+  bm25_top1:
+    method_name: sciq_bm25_top1
+    turn_on: True
+    summarize: False
+    keep_both: False
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "SciQ support corpus BM25 - top1 passage"
+
+  # 5&6. Support语料库 BM25 top5 (keep_both=True 同时产出 bm25_top5 和 bm25_top5_sum)
+  bm25_top5:
+    method_name: sciq_bm25_top5
+    turn_on: True
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "SciQ support corpus BM25 - top5 passages, with and without summary"
+
+  # 7. 模型生成参考文档
+  gendoc:
+    method_name: gendoc
+    turn_on: True
+    summarize: False
+    keep_both: False
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "Generate reference document with model"
+
+# 模块配置
+ModuleConfig:
+  Web:
+    type: Web
+    verbose: True
+    turn_on: True
+    load_result_file: web_doc.json
+    save_result_file: web_doc.json
+    load_info_file: web_info.json
+    save_info_file: web_info.json
+    ssl_verify: False
+    min_doc_len: 50
+    max_doc_len: 2000
+    api_key: null
+
+  SciQBm25:
+    type: SciQBm25
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: sciq_bm25_result.json
+    load_info_file:
+    save_info_file: sciq_bm25_info.json
+    top_k: 5
+    corpus_path: ./data/datasets/sciq/support_corpus.json
+    bm25_index_path: ./data/datasets/sciq/sciq_bm25_index.pkl
+
+  Contriever:
+    type: Contriever
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: contriever_result.json
+    load_info_file:
+    save_info_file: contriever_info.json
+    batch_size: 6
+    top_k: 5
+    language: en
+    query_encoder: en_query_encoder
+    paragraph_encoder: en_paragraph_encoder
+    min_knowledge_len: 300
+    en_query_model_name: en_query_encoder
+    en_paragraph_model_name: en_paragraph_encoder
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      max_length: 512
+    encode_kwargs:
+      batch_size: 40
+      pooling_method: mean
+
+  Gendoc:
+    type: Gendoc
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: gen_doc.json
+    load_info_file:
+    save_info_file: gendoc_info.json
+    log_detail: False
+    zh_model_name: llama3.1-8b-instruct
+    zh_template_id: 1
+    en_model_name: llama3.1-8b-instruct
+    en_template_id: 1
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      padding_side: left
+    generate_kwargs:
+      batch_size: 3
+      temperature: 0.7
+      top_p: 0.8
+      top_k: 50
+      repetition_penalty: 1.2
+      do_sample: False
+      eos_token_id: [128001, 128009]
+
+  Summarizer:
+    type: Summarizer
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: summarizer_result.json
+    load_info_file:
+    save_info_file: summarizer_info.json
+    batch_size: 1
+    zh_model_name: llama3.1-8b-instruct
+    en_model_name: llama3.1-8b-instruct
+    zh_template_id: 1
+    en_template_id: 1
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      padding_side: left
+    generate_kwargs:
+      batch_size: 1
+      temperature: 0.8
+      top_p: 0.9
+      top_k: 50
+      repetition_penalty: 1.2
+      do_sample: False
+      max_new_tokens: 300
+      eos_token_id: [128001, 128009]
+
+  Generator:
+    type: Generator
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: generator_result.json
+    load_info_file:
+    save_info_file: generator_info.json
+    batch_size: 2
+    zh_model_name: llama3.1-8b-instruct
+    zh_template_id: 1
+    zh_query_only_template_id: 2
+    en_model_name: llama3.1-8b-instruct
+    en_template_id: 5
+    en_query_only_template_id: 6
+    system_id: 2
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      padding_side: left
+      truncation_side: left
+    generate_kwargs:
+      batch_size: 2
+      temperature: 0.7
+      top_p: 0.9
+      top_k: 50
+      do_sample: False
+      max_new_tokens: 200
+      num_responses_per_prompt: 1
+      repetition_penalty: 1.2
+      eos_token_id: [128001, 128009]
+
+  Voter:
+    type: Voter
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: vote_result.json
+    load_info_file:
+    save_info_file: vote_info.json
+    scoring_method: composition
+    bidirectional:
+      nli: True
+      nli_with_query: True
+      em: True
+    composition_weight: [0, 0, 0, 1, 1, 0]
+    threshold: 0.0
+    pooling_method: mean
+    pooling_threshold:
+    min_acceptance_num: 2
+    mean_pooling_topk:
+    method_weight: True
+    batch_size: 64
+    hierarchical_voting:
+      turn_on: True
+      pooling_method: majority_voting
+      pooling_threshold:
+      min_acceptance_num: 2
+      mean_pooling_topk:
+
+# LLM配置
+LLMConfig:
+  en_query_encoder:
+    model_name: en_query_encoder
+    model_path: ./data/model/contriever-msmarco
+    model_class: AutoModel
+    fp16: false
+    tokenizer_class: AutoTokenizer
+
+  en_paragraph_encoder:
+    model_name: en_paragraph_encoder
+    model_path: ./data/model/contriever-msmarco
+    model_class: AutoModel
+    fp16: false
+    tokenizer_class: AutoTokenizer
+
+  deberta:
+    model_name: deberta
+    model_path: ./data/model/microsoft-deberta-xlarge-mnli
+    model_class: AutoModel
+    fp16: false
+    tokenizer_class: AutoTokenizer
+
+  deberta_nli:
+    model_name: deberta_nli
+    model_path: ./data/model/microsoft-deberta-xlarge-mnli
+    model_class: AutoModelForSequenceClassification
+    fp16: false
+    tokenizer_class: AutoTokenizer
+
+  llama-llm2:
+    model_name: llama3.1-8b-instruct
+    model_path: ./data/model/llama3.1_8b
+    model_class: AutoModelForCausalLM
+    fp16: true
+    tokenizer_class: AutoTokenizer
+    load_in_8bit: false
+    trust_remote_code: true
+
+# GPU映射配置
+LLMMap:
+    gpu1: llama-llm2, en_query_encoder, en_paragraph_encoder, deberta_nli, deberta

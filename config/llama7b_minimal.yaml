@@ -1,0 +1,301 @@
+# 最小内存使用配置 - 适用于显存不足的情况
+# Project
+
+log_detail: False 
+max_knowledge_length: 300 # 进一步减少到300
+tokenizer:  
+
+seed: 42
+
+# Dataset or file
+data: open_natural_question
+test_file: ./data/datasets/open_natural_question/10_example.jsonl
+
+cache_dir: 
+cache_parameter_dir: ./output/parameter_setting/nq-llama-7b.txt
+ignore_method_weight: 0.1
+
+# Output dir
+output_dir: ./output/
+
+result_file: result.json
+result_info_file: result_info.json
+
+run_evaluation: True
+cached_score_path: 
+
+# 使用多GPU分布式 - 模型并行
+gpu: [0, 1, 2, 3]  # 使用多张GPU卡
+
+ControllerConfig:
+# 设置默认模块 - 最小内存配置
+  Web:
+  Wiki:
+  Gendoc: 
+  Contriever:
+  Summarizer:
+
+GeneratorConfig:
+  turn_on: True
+  module: 
+  without_retrieval: False
+  dynamic_retrieval: False  # 关闭动态检索
+
+EvaluatorConfig:
+  VoterModule:
+    turn_on: False  # 关闭投票模块
+    module:
+  ScorerModule:
+    turn_on: False  # 关闭评分模块
+    module:
+
+ControlConfig:
+  wiki:
+    method_name: wiki
+    turn_on: True # 只启用wiki方法
+    summarize: True 
+    keep_both: False  # 不保留两个版本以节省内存
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "append 10 best wiki paragraph"
+  gendoc:
+    method_name: gendoc
+    turn_on: False  # 关闭
+    summarize: False
+    keep_both: False
+    Modules:
+      retriever: 
+      contriever:
+      summarizer:
+    help: "generate doc with module Gendoc"
+  gc:
+    method_name: google_contrieve
+    turn_on: False  # 关闭以节省资源
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever: 
+      summarizer:
+    help: "split google docs into paragraphs with 100 words each, then use contriever to select the best 10."
+  gg:
+    method_name: google_best
+    turn_on: False  # 关闭
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever: 
+      contriever:
+      summarizer:
+    help: "select the best google doc"
+  gm:
+    method_name: google_merge
+    turn_on: False  # 关闭
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "simply truncate the top-4 google docs into 250 words then concatenate them"
+  gm_w:
+    method_name: google_merge+wiki
+    turn_on: False
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "concate the top 2 from google merged and top 5 from wiki"
+  gc_w:
+    method_name: google_contrieve+wiki
+    turn_on: False
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "concate the top 5 from google contrieved and top 5 from wiki"
+  c_all: 
+    method_name: contrieve_all_sources
+    turn_on: False
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "concate all retrieved sources then contrieve"
+
+# 模块配置 - 最小batch size
+ModuleConfig:
+  Wiki:
+    type: Wiki
+    verbose: True
+    turn_on: True
+    load_result_file: 
+    save_result_file: wiki_result.json
+    load_info_file: 
+    save_info_file: wiki_info.json
+    batch_size: 32  # 进一步减少
+    top_k: 3        # 减少检索数量
+    language: en
+    
+  Contriever:
+    type: Contriever
+    verbose: True
+    turn_on: True
+    load_result_file: 
+    save_result_file: contriever_result.json
+    load_info_file: 
+    save_info_file: contriever_info.json
+    batch_size: 1   # 最小内存配置
+    top_k: 5
+    language: en
+    query_encoder: en_query_encoder
+    paragraph_encoder: en_paragraph_encoder
+    
+  Gendoc:
+    type: Gendoc
+    verbose: True
+    turn_on: True
+    load_result_file: 
+    save_result_file: gen_doc.json
+    load_info_file: 
+    save_info_file: gendoc_info.json
+    log_detail: False
+    zh_model_name: llama-llm1
+    zh_template_id: 1
+    en_model_name: llama-llm1
+    en_template_id: 1
+    tokenize_kwargs:
+      padding: "longest"
+      truncation: True
+      padding_side: left
+    generate_kwargs:
+      batch_size: 1
+      temperature: 0.7
+      top_p: 0.8
+      top_k: 50
+      repetition_penalty: 
+      do_sample: False
+    
+  Summarizer:
+    type: Summarizer
+    verbose: True
+    turn_on: True
+    load_result_file: 
+    save_result_file: summarizer_result.json
+    load_info_file: 
+    save_info_file: summarizer_info.json
+    batch_size: 1   # 最小batch size
+    zh_model_name: llama-llm1
+    en_model_name: llama-llm1
+    zh_template_id: 1
+    en_template_id: 1
+    
+  Generator:
+    type: Generator
+    verbose: True
+    turn_on: True
+    load_result_file: 
+    save_result_file: generator_result.json
+    load_info_file: 
+    save_info_file: generator_info.json
+    batch_size: 1   # 最小内存配置
+    zh_model_name: llama-llm1
+    zh_template_id: 1
+    zh_query_only_template_id: 2
+    en_model_name: llama-llm1
+    en_template_id: 1
+    en_query_only_template_id: 2
+    system_id: 
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      padding_side: left
+      truncation_side: left
+    generate_kwargs:
+      batch_size: 1
+      temperature: 0.8
+      top_p: 0.9
+      top_k: 50
+      do_sample: False
+      max_new_tokens: 100
+      num_responses_per_prompt: 1
+    
+  Voter:
+    type: Voter
+    verbose: True
+    load_result_file: 
+    save_result_file: vote_result.json
+    load_info_file: 
+    save_info_file: vote_info.json
+    scoring_method: composition
+    bidirectional:
+      nli: True
+      nli_with_query: True
+      em: True
+    composition_weight: [0, 0, 0, 1, 1, 0]
+    threshold: 0.0
+    pooling_method: mean
+    pooling_threshold: 
+    min_acceptance_num: 2
+    mean_pooling_topk: 
+    method_weight: True
+    batch_size: 32
+    hierarchical_voting: 
+      turn_on: True
+      pooling_method: majority_voting
+      pooling_threshold: 
+      min_acceptance_num: 2
+      mean_pooling_topk:
+    
+  Scorer:
+    type: Scorer
+    verbose: True
+    load_result_file: 
+    save_result_file: score_result.json
+    load_info_file: 
+    save_info_file: score_info.json
+    zh_model_name: llama-llm1
+    zh_template_id: 1
+    en_model_name: llama-llm1
+    en_template_id: 1
+    tokenize_kwargs: 
+      padding: longest
+      truncation: False
+    reward_kwargs:
+      batch_size: 16
+
+# LLM配置 - 多GPU分布式设置
+LLMConfig:
+  llama-llm1:
+    type: llama
+    model_name: ./data/model/llama7b
+    device_name: auto  # 自动分配到多GPU
+    load_in_8bit: true  # 启用8bit量化
+    torch_dtype: float16  # 使用半精度
+    device_map: auto  # 自动模型并行
+    generate_kwargs:
+      do_sample: false
+      temperature: 0.7
+      top_p: 0.9
+      max_new_tokens: 50
+      batch_size: 1  # 最小batch size
+    tokenize_kwargs:
+      padding: true
+      truncation: true
+      max_length: 1024  # 减少最大长度
+      return_tensors: pt
+
+# GPU映射配置 - 将不同模块分配到不同GPU
+LLMMap:
+  gpu0: llama-llm1  # 主模型在GPU 0
+  gpu1:             # GPU 1用于其他任务
+  gpu2:             # GPU 2用于其他任务  
+  gpu3:             # GPU 3用于其他任务

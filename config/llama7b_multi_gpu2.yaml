@@ -1,0 +1,374 @@
+# 双GPU配置 - 使用空闲的GPU 0和1
+# Project
+
+log_detail: False
+max_knowledge_length: 1000 # 与 Llama2 配置保持一致
+tokenizer:
+ddp: False  # 单GPU不需要DDP
+seed: 42
+
+# Dataset or file
+data: open_natural_question
+test_file: ./data/datasets/open_natural_question/webq-train4.jsonl
+
+cache_dir: ./output/2026-03-24-16-32-43
+cache_parameter_dir: ./output/parameter_setting/nq-llama-7b2.txt
+ignore_method_weight: 0.1
+
+# Output dir
+output_dir: ./output/
+
+result_file: result.json
+result_info_file: result_info.json
+
+run_evaluation: True
+cached_score_path:
+
+# 单GPU设置
+gpu: [2]  # 只使用GPU 0
+
+ControllerConfig:
+# 设置默认模块 - 多GPU优化配置
+  Web:
+  Wiki:
+  Gendoc:
+  Contriever:
+  Summarizer:
+
+GeneratorConfig:
+  turn_on: True
+  module:
+  without_retrieval: False
+  dynamic_retrieval: True  # 启用动态检索
+
+EvaluatorConfig:
+  VoterModule:
+    turn_on: True  # 启用投票模块
+    module:
+  ScorerModule:
+    turn_on: False  # 关闭评分模块（缺少reward model）
+    module:
+
+ControlConfig:
+  wiki:
+    method_name: wiki
+    turn_on: False
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "append 10 best wiki paragraph"
+  gendoc:
+    method_name: gendoc
+    turn_on: True
+    summarize: False
+    keep_both: False
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "generate doc with module Gendoc"
+  gc:
+    method_name: google_contrieve
+    turn_on: True
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "split google docs into paragraphs with 100 words each, then use contriever to select the best 10."
+  gg:
+    method_name: google_best
+    turn_on: True
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "select the best google doc"
+  gm:
+    method_name: google_merge
+    turn_on: True
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "simply truncate the top-4 google docs into 250 words then concatenate them"
+  gm_w:
+    method_name: google_merge+wiki
+    turn_on: False
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "concate the top 2 from google merged and top 5 from wiki"
+  gc_w:
+    method_name: google_contrieve+wiki
+    turn_on: False
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "concate the top 5 from google contrieved and top 5 from wiki"
+  c_all:
+    method_name: contrieve_all_sources
+    turn_on: False
+    summarize: True
+    keep_both: True
+    Modules:
+      retriever:
+      contriever:
+      summarizer:
+    help: "concate all retrieved sources then contrieve"
+
+# 模块配置 - 利用多GPU提高batch size
+ModuleConfig:
+  Web:
+    type: Web
+    verbose: True
+    turn_on: True
+    load_result_file: web_doc.json
+    save_result_file: web_doc.json
+    load_info_file: web_info.json
+    save_info_file: web_info.json
+    ssl_verify: False
+    min_doc_len: 50
+    max_doc_len: 2000
+    api_key: null
+
+  Wiki:
+    type: Wiki
+    verbose: True
+    turn_on: False
+    load_result_file:
+    save_result_file: wiki_result.json
+    load_info_file:
+    save_info_file: wiki_info.json
+    batch_size: 128
+    top_k: 5
+    language: en
+
+  Contriever:
+    type: Contriever
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: contriever_result.json
+    load_info_file:
+    save_info_file: contriever_info.json
+    batch_size: 6
+    top_k: 5
+    language: en
+    query_encoder: en_query_encoder
+    paragraph_encoder: en_paragraph_encoder
+    min_knowledge_len: 300
+    en_query_model_name: en_query_encoder
+    en_paragraph_model_name: en_paragraph_encoder
+    zh_query_model_name: zh_encoder
+    zh_paragraph_model_name: zh_encoder
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      max_length: 512
+    encode_kwargs:
+      batch_size: 40
+      pooling_method: mean
+
+  Gendoc:
+    type: Gendoc
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: gen_doc.json
+    load_info_file:
+    save_info_file: gendoc_info.json
+    log_detail: False
+    zh_model_name: llama3.1-8b-instruct
+    zh_template_id: 1
+    en_model_name: llama3.1-8b-instruct
+    en_template_id: 1
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      padding_side: left
+    generate_kwargs:
+      batch_size: 3
+      temperature: 0.7
+      top_p: 0.8
+      top_k: 50
+      repetition_penalty: 1.2
+      do_sample: False
+      eos_token_id: [128001, 128009]
+
+  Summarizer:
+    type: Summarizer
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: summarizer_result.json
+    load_info_file:
+    save_info_file: summarizer_info.json
+    batch_size: 1
+    zh_model_name: llama3.1-8b-instruct
+    en_model_name: llama3.1-8b-instruct
+    zh_template_id: 1
+    en_template_id: 1
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      padding_side: left
+    generate_kwargs:
+      batch_size: 1
+      temperature: 0.8
+      top_p: 0.9
+      top_k: 50
+      repetition_penalty: 1.2
+      do_sample: False
+      max_new_tokens: 300
+      eos_token_id: [128001, 128009]
+
+  Generator:
+    type: Generator
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: generator_result.json
+    load_info_file:
+    save_info_file: generator_info.json
+    batch_size: 2
+    zh_model_name: llama3.1-8b-instruct
+    zh_template_id: 1
+    zh_query_only_template_id: 2
+    en_model_name: llama3.1-8b-instruct
+    en_template_id: 5
+    en_query_only_template_id: 6
+    system_id: 2
+    tokenize_kwargs:
+      padding: longest
+      truncation: True
+      padding_side: left
+      truncation_side: left
+    generate_kwargs:
+      batch_size: 2
+      temperature: 0.7
+      top_p: 0.9
+      top_k: 50
+      do_sample: False
+      max_new_tokens: 200
+      num_responses_per_prompt: 1
+      repetition_penalty: 1.2
+      eos_token_id: [128001, 128009]
+
+  Voter:
+    type: Voter
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: vote_result.json
+    load_info_file:
+    save_info_file: vote_info.json
+    scoring_method: composition
+    bidirectional:
+      nli: True
+      nli_with_query: True
+      em: True
+    composition_weight: [0, 0, 0, 1, 1, 0]
+    threshold: 0.0
+    pooling_method: mean
+    pooling_threshold:
+    min_acceptance_num: 2
+    mean_pooling_topk:
+    method_weight: True
+    batch_size: 64
+    hierarchical_voting:
+      turn_on: True
+      pooling_method: majority_voting
+      pooling_threshold:
+      min_acceptance_num: 2
+      mean_pooling_topk:
+
+  Scorer:
+    type: Scorer
+    verbose: True
+    turn_on: True
+    load_result_file:
+    save_result_file: score_result.json
+    load_info_file:
+    save_info_file: score_info.json
+    zh_model_name: llama2_base_reward_model
+    zh_template_id: 1
+    en_model_name: llama2_base_reward_model
+    en_template_id: 1
+    tokenize_kwargs:
+      padding: longest
+      truncation: False
+    reward_kwargs:
+      batch_size: 40
+
+# LLM配置
+LLMConfig:
+  llama-llm1:
+    model_name: llama2-chat-7b
+    model_path: ./data/model/llama7b/llama7b
+    model_class: LlamaForCausalLM
+    fp16: true
+    tokenizer_class: LlamaTokenizer
+    load_in_8bit: false
+
+  en_query_encoder:
+    model_name: en_query_encoder
+    model_path: ./data/model/contriever-msmarco
+    model_class: AutoModel
+    fp16: false
+    tokenizer_class: AutoTokenizer
+
+  en_paragraph_encoder:
+    model_name: en_paragraph_encoder
+    model_path: ./data/model/contriever-msmarco
+    model_class: AutoModel
+    fp16: false
+    tokenizer_class: AutoTokenizer
+
+  deberta:
+    model_name: deberta
+    model_path: ./data/model/microsoft-deberta-xlarge-mnli
+    model_class: AutoModel
+    fp16: false
+    tokenizer_class: AutoTokenizer
+
+  deberta_nli:
+    model_name: deberta_nli
+    model_path: ./data/model/microsoft-deberta-xlarge-mnli
+    model_class: AutoModelForSequenceClassification
+    fp16: false
+    tokenizer_class: AutoTokenizer
+
+  llama2_base_reward_model:
+    model_name: llama2_base_reward_model
+    model_path: ./data/model/llama2_base_reward_model/pytorch_model.bin
+    model_class: LlamaModel
+    fp16: true
+    tokenizer_class: LlamaTokenizer
+
+  llama-llm2:
+    model_name: llama3.1-8b-instruct
+    model_path: ./data/model/llama3.1_8b
+    model_class: AutoModelForCausalLM
+    fp16: true
+    tokenizer_class: AutoTokenizer
+    load_in_8bit: false
+    trust_remote_code: true
+
+# GPU映射配置
+LLMMap:
+    gpu1: llama-llm2, en_query_encoder, en_paragraph_encoder, deberta_nli, deberta
