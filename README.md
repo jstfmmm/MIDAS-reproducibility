@@ -106,6 +106,19 @@ python inference3.py \
 
 The final policy combines normalized vote scores and policy scores with code-level weights `W_VOTE=0.8` and `W_MODEL=0.2`. The script reports EM, F1, BEM score, BEM accuracy, and timing for the baseline, EoR-weighted, RRF, and proposed selections. A method-weight file is optional; omit `--weight_file` when the EoR-weighted comparison is not needed.
 
+### Ablation and comparison scripts
+
+The repository includes the training and inference entry points used for the paper's ablations and encoder comparison. They are kept alongside the main experiment so that each reported comparison can be reproduced from its corresponding source file.
+
+| Training script | Inference script | Comparison |
+|---|---|---|
+| `run_contextual_rl_training3_no_asymmetric.py` | `inference3_no_asymmetric.py` | Symmetric reward ablation; removes the Type A/Type B asymmetric reward magnitudes. |
+| `run_contextual_rl_training3_no_sampling.py` | `inference3_no_sampling.py` | Sampling ablation; removes the fixed Type A/Type B sampling proportions and follows the available data distribution. |
+| `run_contextual_rl_training3_no_semantic.py` | `inference3_no_semantic.py` | Semantic-feature ablation; removes semantic query features and retains the voting/statistical features. |
+| `run_contextual_rl_training3_bert.py` | `inference3_bert.py` | BERT policy-encoder comparison. |
+
+The main contextual-RL script currently defaults to 150 epochs. Some legacy ablation scripts in this repository default to 200 epochs, while the BERT training script uses its own encoder and optimization defaults. These values are source-level defaults; use the command-line arguments and configuration in the selected script when reproducing a specific table or ablation. The scripts require the same external datasets, retrieval outputs, encoder checkpoints, and output directories described above; those files remain ignored and are not committed.
+
 ### Code-level policy configuration (verified)
 
 The values below are read directly from `run_contextual_rl_training3.py` and `inference3.py` and are the reproducibility values that can be supported by this source tree:
@@ -154,4 +167,3 @@ The following items remain unresolved and must be supplied before claiming a ful
 ## License and upstream attribution
 
 The `eor/` implementation is derived from the upstream Ensemble-of-Retrievers project. Preserve its original license and attribution requirements when publishing this repository. Add the applicable license file before public release if the upstream license requires it.
-# MIDAS-reproducibility
