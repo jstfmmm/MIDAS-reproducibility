@@ -1,6 +1,6 @@
 # MIDAS / Contextual RL reproducibility repository
 
-This repository contains the cleaned source code for the MIDAS contextual residual policy and the underlying Ensemble-of-Retrievers (EoR) framework. The repository is intended to be uploaded as source code. Datasets, downloaded model weights, retrieval indexes, checkpoints, API credentials, caches, and previous experiment outputs are deliberately excluded.
+This repository contains the cleaned source code for the MIDAS contextual residual policy and the underlying Ensemble-of-Retrievers (EoR) framework. Full datasets, downloaded model weights, retrieval indexes, checkpoints, API credentials, and experiment outputs are excluded. A small web retrieval example is included as described below.
 
 ## Repository layout
 
@@ -14,7 +14,7 @@ config/                          YAML templates for the EoR pipeline
 data/datasets/                   dataset conversion and sampling utilities only
 ```
 
-The following paths are reserved for local files and ignored by Git (the clean copy contains no experiment data, model weights, indexes, or outputs):
+The following paths are reserved for local files and ignored by Git (the repository does not include full experiment datasets, model weights, indexes, or outputs):
 
 ```text
 data/datasets/   input datasets and processed JSON/JSONL files
@@ -160,7 +160,11 @@ The templates describe the available modules and their retrieval/generation sett
 
 Download the NQ, TriviaQA, and WebQ source files from the dataset location documented by the upstream EoR project, then process them with the utilities under `data/datasets/`. Keep the resulting files under the ignored `data/datasets/` directory. The BEM evaluator expects the Google Answer Equivalence model (`google/answer_equivalence/bem/1`) and the local vocabulary file already retained under `eor/evaluation/metrics/vocab.txt`; place the downloaded BEM model under `data/model/` or adjust the evaluator path locally. Contriever/WebGLM encoders and causal language models are likewise external dependencies and should be referenced by Hugging Face ID or a local path.
 
-Do not commit raw web snapshots, generated answer files, model directories, checkpoints, `.env`, or logs. The cleaned repository contains no original experiment outputs and no API credentials. Exact numerical reproduction still requires the same dataset snapshot, model revisions, retrieval index, CUDA/PyTorch build, and random seeds used for the target experiment; those external revisions were not bundled into the source-only repository.
+### Example web retrieval snapshot
+
+The `snapshots/web-example/` directory contains the supplied `web_doc.json` and `web_info.json` cache files for three queries. They include retrieved document text and search/fetch metadata, respectively. The files are a partial example, not the full training or test data, and their connection to any reported experiment has not been verified. The retrieval date and exact index or model revisions are not established by these files.
+
+Generated answer files, model directories, checkpoints, `.env`, and logs are not included. Exact numerical reproduction still requires the full dataset and retrieval snapshots, model revisions, retrieval index, CUDA/PyTorch build, and random seeds used for the target experiment.
 
 The following items remain unresolved and must be supplied before claiming a fully closed P0 reproducibility record: the exact target YAML/config revision; dataset and web/Wikipedia snapshot identifiers or hashes; the Pyserini/FAISS and model revisions actually used; exact CUDA, driver, PyTorch and hardware information; the original repository commit or release; and the checkpoint file and metadata used for the reported results. The source tree contains no evidence for a 200-epoch run or an `epoch-191` checkpoint; the checked-in contextual RL script defaults to 150 epochs and writes `best_rl_v5_1.pth`.
 
